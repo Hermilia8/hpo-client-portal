@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HPO Client Project Portal</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --marian-blue: #3B5B92; --rose-pink: #E5A9BD; --gold: #C9A227;
+      --ivory: #FBF7F0; --deep-navy: #2A3A5C; --text-dark: #1a1a2e;
+      --text-mid: #444; --border: #d0cfc8; --radius: 8px;
+      --shadow: 0 2px 8px rgba(0,0,0,0.10);
+    }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--ivory); color: var(--text-dark); min-height: 100vh; }
+    header { background: var(--deep-navy); color: #fff; padding: 1.25rem 1.5rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; box-shadow: var(--shadow); }
+    .header-left h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: 0.01em; color: var(--gold); }
+    .header-left p { font-size: 0.78rem; color: var(--rose-pink); margin-top: 0.2rem; font-style: italic; }
+    #auth-section { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+    #auth-section input { padding: 0.4rem 0.6rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.85rem; width: 160px; background: #fff; color: var(--text-dark); }
+    #auth-section input::placeholder { color: #999; }
+    button { cursor: pointer; border: none; border-radius: var(--radius); font-size: 0.85rem; font-weight: 600; padding: 0.45rem 0.9rem; transition: opacity 0.15s; }
+    button:hover { opacity: 0.85; } button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--gold); color: var(--deep-navy); }
+    .btn-danger { background: #c0392b; color: #fff; }
+    .btn-edit { background: var(--rose-pink); color: var(--deep-navy); }
+    .btn-logout { background: transparent; border: 1.5px solid var(--rose-pink); color: var(--rose-pink); padding: 0.4rem 0.8rem; }
+    #login-toggle-btn { background: transparent; border: 1.5px solid var(--gold); color: var(--gold); }
+    #login-form { display: none; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+    #login-form.visible { display: flex; }
+    #user-status { font-size: 0.8rem; color: var(--rose-pink); display: none; align-items: center; gap: 0.5rem; }
+    #user-status.visible { display: flex; }
+    main { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+    #message-box { border-radius: var(--radius); padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.88rem; display: none; }
+    #message-box.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; display: block; }
+    #message-box.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; display: block; }
+    #message-box.info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; display: block; }
+    .controls-bar { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1.2rem; align-items: center; }
+    .controls-bar input, .controls-bar select { padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.88rem; background: #fff; color: var(--text-dark); }
+    #search-input { flex: 1 1 180px; max-width: 300px; }
+    #add-form-section { background: #fff; border: 1.5px solid var(--marian-blue); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem; display: none; }
+    #add-form-section h2 { font-size: 1rem; color: var(--deep-navy); margin-bottom: 1rem; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+    .form-group { display: flex; flex-direction: column; gap: 0.3rem; }
+    .form-group label { font-size: 0.78rem; font-weight: 600; color: var(--marian-blue); text-transform: uppercase; letter-spacing: 0.03em; }
+    .form-group input, .form-group select { padding: 0.5rem 0.6rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.88rem; background: var(--ivory); color: var(--text-dark); font-family: inherit; }
+    .form-group input:focus, .form-group select:focus { outline: 2px solid var(--marian-blue); background: #fff; }
+    .form-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+    .table-wrapper { overflow-x: auto; border-radius: var(--radius); box-shadow: var(--shadow); background: #fff; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    thead { background: var(--deep-navy); color: #fff; }
+    thead th { padding: 0.75rem 1rem; text-align: left; font-weight: 600; white-space: nowrap; }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+    tbody tr:hover { background: #f3f0e8; } tbody tr:last-child { border-bottom: none; }
+    td { padding: 0.7rem 1rem; vertical-align: top; color: var(--text-mid); }
+    td.project-name { font-weight: 600; color: var(--deep-navy); }
+    .status-badge { display: inline-block; padding: 0.25rem 0.6rem; border-radius: 99px; font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
+    .status-not-started { background: #e9ecef; color: #495057; }
+    .status-in-progress { background: #cce5ff; color: #004085; }
+    .status-waiting { background: #fff3cd; color: #856404; }
+    .status-in-review { background: #e2d9f3; color: #4a0e8f; }
+    .status-complete { background: #d4edda; color: #155724; }
+    .pillar-badge { display: inline-block; padding: 0.2rem 0.55rem; border-radius: var(--radius); font-size: 0.75rem; font-weight: 600; background: var(--rose-pink); color: var(--deep-navy); }
+    .row-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .row-actions button { font-size: 0.78rem; padding: 0.3rem 0.65rem; }
+    .timestamp { font-size: 0.75rem; color: #888; }
+    #loading-state, #empty-state, #error-state { text-align: center; padding: 3rem 1rem; color: var(--text-mid); font-size: 0.95rem; display: none; }
+    #loading-state.visible, #empty-state.visible, #error-state.visible { display: block; }
+    #error-state { color: #721c24; }
+    .spinner { width: 36px; height: 36px; border: 4px solid var(--border); border-top-color: var(--marian-blue); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 0.75rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100; display: none; align-items: center; justify-content: center; padding: 1rem; }
+    #modal-overlay.visible { display: flex; }
+    #modal-box { background: #fff; border-radius: var(--radius); padding: 1.5rem; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.25); }
+    #modal-box h2 { font-size: 1rem; color: var(--deep-navy); margin-bottom: 1rem; }
+    footer { text-align: center; padding: 1.5rem; font-size: 0.78rem; color: #aaa; border-top: 1px solid var(--border); margin-top: 2rem; }
+    @media (max-width: 640px) {
+      .table-wrapper { display: none; }
+      .card-list { display: flex; flex-direction: column; gap: 1rem; }
+      .project-card { background: #fff; border-radius: var(--radius); padding: 1rem; box-shadow: var(--shadow); border-left: 4px solid var(--marian-blue); }
+      .card-title { font-weight: 700; color: var(--deep-navy); margin-bottom: 0.4rem; font-size: 0.95rem; }
+      .card-meta { font-size: 0.82rem; color: var(--text-mid); margin-bottom: 0.25rem; }
+      .card-actions { margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    }
+    @media (min-width: 641px) { .card-list { display: none; } }
+  </style>
+</head>
+<body>
+<header>
+  <div class="header-left">
+    <h1>HPO Client Project Portal</h1>
+    <p>Training demonstration using synthetic data</p>
+  </div>
+  <div id="auth-section">
+    <button id="login-toggle-btn" onclick="toggleLoginForm()">Owner Login</button>
+    <div id="login-form">
+      <input type="email" id="login-email" placeholder="Email" autocomplete="email" />
+      <input type="password" id="login-password" placeholder="Password" autocomplete="current-password" />
+      <button class="btn-primary" onclick="handleLogin()">Log in</button>
+      <button onclick="toggleLoginForm()" style="background:transparent;color:#ccc;border:1px solid #555;">Cancel</button>
+    </div>
+    <div id="user-status">
+      <span>Logged in as owner</span>
+      <button class="btn-logout" onclick="handleLogout()">Logout</button>
+    </div>
+  </div>
+</header>
+<main>
+  <div id="message-box" role="alert"></div>
+  <section id="add-form-section" aria-label="Add new project row">
+    <h2>Add New Project Row</h2>
+    <div class="form-grid">
+      <div class="form-group"><label for="f-project-name">Project Name *</label><input type="text" id="f-project-name" placeholder="e.g. Sample Social Media Calendar" maxlength="200" /></div>
+      <div class="form-group"><label for="f-client-label">Client Label *</label><input type="text" id="f-client-label" placeholder="e.g. Practice Client Alpha" maxlength="200" /></div>
+      <div class="form-group"><label for="f-pillar">Pillar *</label><select id="f-pillar"><option value="">— Select —</option><option>Content</option><option>Sales</option><option>Delivery</option><option>Systems</option></select></div>
+      <div class="form-group"><label for="f-status">Status *</label><select id="f-status"><option value="">— Select —</option><option>Not started</option><option>In progress</option><option>Waiting</option><option>In review</option><option>Complete</option></select></div>
+      <div class="form-group"><label for="f-last-update">Last Update</label><input type="text" id="f-last-update" placeholder="e.g. Draft calendar prepared" maxlength="300" /></div>
+      <div class="form-group"><label for="f-next-step">Next Step</label><input type="text" id="f-next-step" placeholder="e.g. Review captions" maxlength="300" /></div>
+      <div class="form-group"><label for="f-waiting-on">Waiting On</label><input type="text" id="f-waiting-on" placeholder="Nothing" maxlength="300" /></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="handleAddRow()">Add Row</button>
+      <button onclick="clearAddForm()" style="background:#eee;color:#555;">Clear</button>
+    </div>
+  </section>
+  <div class="controls-bar">
+    <input type="text" id="search-input" placeholder="Search projects…" oninput="applyFilters()" aria-label="Search projects" />
+    <select id="filter-pillar" onchange="applyFilters()" aria-label="Filter by pillar"><option value="">All Pillars</option><option>Content</option><option>Sales</option><option>Delivery</option><option>Systems</option></select>
+    <select id="filter-status" onchange="applyFilters()" aria-label="Filter by status"><option value="">All Statuses</option><option>Not started</option><option>In progress</option><option>Waiting</option><option>In review</option><option>Complete</option></select>
+  </div>
+  <div id="loading-state"><div class="spinner"></div>Loading project data…</div>
+  <div id="empty-state">No projects match your current filters.</div>
+  <div id="error-state" role="alert"><strong>Could not load projects.</strong><br /><span id="error-detail"></span></div>
+  <div class="table-wrapper" id="table-wrapper">
+    <table aria-label="Project updates">
+      <thead><tr><th>Project Name</th><th>Client</th><th>Pillar</th><th>Status</th><th>Last Update</th><th>Next Step</th><th>Waiting On</th><th>Updated</th><th id="actions-col" style="display:none;">Actions</th></tr></thead>
+      <tbody id="table-body"></tbody>
+    </table>
+  </div>
+  <div class="card-list" id="card-list"></div>
+</main>
+<div id="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div id="modal-box">
+    <h2 id="modal-title">Edit Project Row</h2>
+    <input type="hidden" id="m-id" />
+    <div class="form-grid">
+      <div class="form-group"><label for="m-project-name">Project Name *</label><input type="text" id="m-project-name" maxlength="200" /></div>
+      <div class="form-group"><label for="m-client-label">Client Label *</label><input type="text" id="m-client-label" maxlength="200" /></div>
+      <div class="form-group"><label for="m-pillar">Pillar *</label><select id="m-pillar"><option>Content</option><option>Sales</option><option>Delivery</option><option>Systems</option></select></div>
+      <div class="form-group"><label for="m-status">Status *</label><select id="m-status"><option>Not started</option><option>In progress</option><option>Waiting</option><option>In review</option><option>Complete</option></select></div>
+      <div class="form-group"><label for="m-last-update">Last Update</label><input type="text" id="m-last-update" maxlength="300" /></div>
+      <div class="form-group"><label for="m-next-step">Next Step</label><input type="text" id="m-next-step" maxlength="300" /></div>
+      <div class="form-group"><label for="m-waiting-on">Waiting On</label><input type="text" id="m-waiting-on" maxlength="300" /></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="handleSaveEdit()">Save Changes</button>
+      <button onclick="closeModal()" style="background:#eee;color:#555;">Cancel</button>
+    </div>
+  </div>
+</div>
+<footer>HPO Client Project Portal — Training demonstration using synthetic data only. Not for real client use.</footer>
+<script>
+const SUPABASE_URL      = 'https://vnvayzhtqlxyfoshkzki.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_gQom7Cr_YzxZItzv_PFxjw_qF2ddIqr';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let allRows = [], isAuthenticated = false;
+function showMessage(text, type) { const box = document.getElementById('message-box'); box.textContent = text; box.className = type || 'info'; box.style.display = 'block'; if (type === 'success') setTimeout(() => { box.style.display = 'none'; }, 6000); }
+function esc(str) { if (str == null) return ''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function statusClass(s) { const m = {'Not started':'status-not-started','In progress':'status-in-progress','Waiting':'status-waiting','In review':'status-in-review','Complete':'status-complete'}; return m[s]||'status-not-started'; }
+function formatDate(iso) { if (!iso) return '—'; const d = new Date(iso); return d.toLocaleDateString('en-PH',{year:'numeric',month:'short',day:'numeric'})+' '+d.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'}); }
+function toggleLoginForm() { const form = document.getElementById('login-form'); form.classList.toggle('visible'); if (form.classList.contains('visible')) document.getElementById('login-email').focus(); }
+async function handleLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  if (!email || !password) { showMessage('Enter both email and password.', 'error'); return; }
+  const { error } = await db.auth.signInWithPassword({ email, password });
+  if (error) { showMessage('Login failed: ' + error.message, 'error'); return; }
+  document.getElementById('login-password').value = '';
+}
+async function handleLogout() { await db.auth.signOut(); }
+db.auth.onAuthStateChange((_event, session) => { isAuthenticated = !!session; updateAuthUI(); renderRows(); });
+function updateAuthUI() {
+  const loginToggle = document.getElementById('login-toggle-btn');
+  const loginForm = document.getElementById('login-form');
+  const userStatus = document.getElementById('user-status');
+  const addForm = document.getElementById('add-form-section');
+  const actionsCol = document.getElementById('actions-col');
+  if (isAuthenticated) { loginToggle.style.display='none'; loginForm.classList.remove('visible'); userStatus.classList.add('visible'); addForm.style.display='block'; actionsCol.style.display=''; showMessage('Logged in. You can now add, edit, and delete rows.','success'); }
+  else { loginToggle.style.display=''; userStatus.classList.remove('visible'); addForm.style.display='none'; actionsCol.style.display='none'; }
+}
+async function loadRows() {
+  document.getElementById('loading-state').classList.add('visible');
+  document.getElementById('table-wrapper').style.display='none';
+  document.getElementById('card-list').style.display='none';
+  document.getElementById('error-state').classList.remove('visible');
+  document.getElementById('empty-state').classList.remove('visible');
+  const { data, error } = await db.from('project_updates').select('*').order('created_at',{ascending:false});
+  document.getElementById('loading-state').classList.remove('visible');
+  document.getElementById('table-wrapper').style.display='';
+  document.getElementById('card-list').style.display='';
+  if (error) { document.getElementById('error-state').classList.add('visible'); document.getElementById('error-detail').textContent=error.message; return; }
+  allRows = data || []; applyFilters();
+}
+function applyFilters() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const pillar = document.getElementById('filter-pillar').value;
+  const status = document.getElementById('filter-status').value;
+  const filtered = allRows.filter(row => {
+    const matchSearch = !search||(row.project_name||'').toLowerCase().includes(search)||(row.client_label||'').toLowerCase().includes(search)||(row.last_update||'').toLowerCase().includes(search)||(row.next_step||'').toLowerCase().includes(search)||(row.waiting_on||'').toLowerCase().includes(search);
+    return matchSearch&&(!pillar||row.pillar===pillar)&&(!status||row.status===status);
+  });
+  renderRows(filtered);
+}
+function renderRows(rows) {
+  if (rows===undefined) rows=allRows;
+  const tbody=document.getElementById('table-body'), cardList=document.getElementById('card-list'), empty=document.getElementById('empty-state');
+  tbody.innerHTML=''; cardList.innerHTML='';
+  if (rows.length===0) { empty.classList.add('visible'); return; }
+  empty.classList.remove('visible');
+  rows.forEach(row => {
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="project-name">${esc(row.project_name)}</td><td>${esc(row.client_label)}</td><td><span class="pillar-badge">${esc(row.pillar)}</span></td><td><span class="status-badge ${statusClass(row.status)}">${esc(row.status)}</span></td><td>${esc(row.last_update||'—')}</td><td>${esc(row.next_step||'—')}</td><td>${esc(row.waiting_on||'Nothing')}</td><td class="timestamp">${formatDate(row.updated_at)}</td><td style="${isAuthenticated?'':'display:none;'}">${isAuthenticated?actionBtns(row.id):''}</td>`;
+    tbody.appendChild(tr);
+    const card=document.createElement('div'); card.className='project-card';
+    card.innerHTML=`<div class="card-title">${esc(row.project_name)}</div><div class="card-meta"><strong>Client:</strong> ${esc(row.client_label)}</div><div class="card-meta"><span class="pillar-badge">${esc(row.pillar)}</span>&nbsp;<span class="status-badge ${statusClass(row.status)}">${esc(row.status)}</span></div><div class="card-meta"><strong>Last update:</strong> ${esc(row.last_update||'—')}</div><div class="card-meta"><strong>Next step:</strong> ${esc(row.next_step||'—')}</div><div class="card-meta"><strong>Waiting on:</strong> ${esc(row.waiting_on||'Nothing')}</div><div class="card-meta timestamp">Updated: ${formatDate(row.updated_at)}</div>${isAuthenticated?`<div class="card-actions">${actionBtns(row.id)}</div>`:''}`;
+    cardList.appendChild(card);
+  });
+}
+function actionBtns(id) { return `<button class="btn-edit" onclick="openEditModal(${id})">Edit</button><button class="btn-danger" onclick="handleDelete(${id})">Delete</button>`; }
+async function handleAddRow() {
+  if (!isAuthenticated) return;
+  const project_name=document.getElementById('f-project-name').value.trim(), client_label=document.getElementById('f-client-label').value.trim(), pillar=document.getElementById('f-pillar').value, status=document.getElementById('f-status').value, last_update=document.getElementById('f-last-update').value.trim(), next_step=document.getElementById('f-next-step').value.trim(), waiting_on=document.getElementById('f-waiting-on').value.trim()||'Nothing';
+  if (!project_name){showMessage('Project Name is required.','error');return;}
+  if (!client_label){showMessage('Client Label is required.','error');return;}
+  if (!pillar){showMessage('Please select a Pillar.','error');return;}
+  if (!status){showMessage('Please select a Status.','error');return;}
+  const {data,error}=await db.from('project_updates').insert([{project_name,client_label,pillar,status,last_update,next_step,waiting_on}]).select();
+  if (error){showMessage('Could not add row: '+error.message+(error.code?' (code: '+error.code+')':''),'error');return;}
+  if (!data||data.length!==1){showMessage('Row was not added. No row was returned by the database. The operation may have been blocked by permissions.','error');return;}
+  showMessage('Row added successfully.','success'); clearAddForm(); await loadRows();
+}
+function clearAddForm() { ['f-project-name','f-client-label','f-pillar','f-status','f-last-update','f-next-step','f-waiting-on'].forEach(id=>{document.getElementById(id).value='';}); }
+function openEditModal(id) {
+  const row=allRows.find(r=>r.id===id); if (!row) return;
+  document.getElementById('m-id').value=row.id; document.getElementById('m-project-name').value=row.project_name||''; document.getElementById('m-client-label').value=row.client_label||''; document.getElementById('m-pillar').value=row.pillar||''; document.getElementById('m-status').value=row.status||''; document.getElementById('m-last-update').value=row.last_update||''; document.getElementById('m-next-step').value=row.next_step||''; document.getElementById('m-waiting-on').value=row.waiting_on||'';
+  document.getElementById('modal-overlay').classList.add('visible');
+}
+function closeModal() { document.getElementById('modal-overlay').classList.remove('visible'); }
+document.getElementById('modal-overlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
+async function handleSaveEdit() {
+  if (!isAuthenticated) return;
+  const id=Number(document.getElementById('m-id').value), project_name=document.getElementById('m-project-name').value.trim(), client_label=document.getElementById('m-client-label').value.trim(), pillar=document.getElementById('m-pillar').value, status=document.getElementById('m-status').value, last_update=document.getElementById('m-last-update').value.trim(), next_step=document.getElementById('m-next-step').value.trim(), waiting_on=document.getElementById('m-waiting-on').value.trim()||'Nothing';
+  if (!project_name){showMessage('Project Name is required.','error');return;}
+  if (!client_label){showMessage('Client Label is required.','error');return;}
+  const {data,error}=await db.from('project_updates').update({project_name,client_label,pillar,status,last_update,next_step,waiting_on}).eq('id',id).select();
+  if (error){showMessage('Could not save changes: '+error.message+(error.code?' (code: '+error.code+')':''),'error');return;}
+  if (!data||data.length!==1){showMessage('No row was updated. The operation may have been blocked by permissions. Confirm you are logged in as the portal owner.','error');return;}
+  showMessage('Row updated successfully.','success'); closeModal(); await loadRows();
+}
+async function handleDelete(id) {
+  const row=allRows.find(r=>r.id===id), name=row?row.project_name:'this row';
+  if (!window.confirm(`Delete "${name}"?\n\nThis cannot be undone.`)) return;
+  const {data,error}=await db.from('project_updates').delete().eq('id',id).select();
+  if (error){showMessage('Could not delete row: '+error.message+(error.code?' (code: '+error.code+')':''),'error');return;}
+  if (!data||data.length!==1){showMessage('No row was deleted. The operation may have been blocked by permissions. Confirm you are logged in as the portal owner.','error');return;}
+  showMessage('Row deleted.','success'); await loadRows();
+}
+(async function init(){
+  const {data:{session}}=await db.auth.getSession();
+  isAuthenticated=!!session; updateAuthUI(); await loadRows();
+})();
+</script>
+</body>
+</html>
